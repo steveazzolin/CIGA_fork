@@ -12,7 +12,6 @@ __pycache__/
 *.pt
 *.model
 *.dgl
-*.txt
 *results/
 # *datasets/
 *.npz
