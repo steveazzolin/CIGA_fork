@@ -16,7 +16,6 @@ __pycache__/
 # *datasets/
 *.npz
 *.npy
-*.sh
 *.log
 *.cmd
 data/*
