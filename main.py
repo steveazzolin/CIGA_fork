@@ -336,6 +336,17 @@ def main():
     logger.info(f"# Train: {len(train_loader.dataset)}  #Val: {len(valid_loader.dataset)} #Test: {len(test_loader.dataset)} ")
     best_weights = None
 
+    if args.log_wandb:
+        name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}"
+        run = wandb.init(
+                project="sedignn",
+                name=name,
+                entity="mcstewe",
+                reinit=True,
+                save_code=False,
+                config=args
+        )
+
     for seed in args.seed:
         set_seed(seed)
         # models and optimizers
@@ -397,20 +408,6 @@ def main():
                          s_rep=args.spurious_rep).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         print(model)
-
-
-        if args.log_wandb:
-            name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}"
-            run = wandb.init(
-                    project="sedignn",
-                    name=name,
-                    entity="mcstewe",
-                    reinit=True,
-                    save_code=False,
-                    config=args
-            )
-            wandb.watch(model)
-
 
         last_train_acc, last_test_acc, last_val_acc = 0, 0, 0
         cnt = 0
@@ -572,9 +569,9 @@ def main():
 
                 if args.log_wandb:
                     wandb.log({
-                        "pred_loss": pred_loss.item(),
-                        "contrast_loss": contrast_loss.item(),
-                        "spu_pred_loss": spu_pred_loss.item(),
+                        f"pred_loss_{seed}": pred_loss.item(),
+                        f"contrast_loss_{seed}": contrast_loss.item(),
+                        f"spu_pred_loss_{seed}": spu_pred_loss.item(),
                     })
 
             all_contrast_loss /= n_bw
@@ -595,9 +592,9 @@ def main():
 
             if args.log_wandb:
                 wandb.log({
-                    "train_acc": train_acc,
-                    "val_acc": val_acc,
-                    "test_acc": test_acc
+                    f"train_acc_{seed}": train_acc,
+                    f"val_acc_{seed}": val_acc,
+                    f"test_acc_{seed}": test_acc
                 })
 
             if val_acc <= last_val_acc:
