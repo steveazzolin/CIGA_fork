@@ -337,6 +337,14 @@ def main():
     best_weights = None
 
     if args.log_wandb:
+        if args.erm:
+            name_model = "ERM"
+        elif args.ginv_opt.lower() in ['asap']:
+            name_model = "ASAP"
+        elif args.ginv_opt.lower() == 'gib':
+            name_model = "GIB"
+        else:
+            name_model = "CIGA" + ("v2" if args.spu_coe > 0 else "v1")
         name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}"
         run = wandb.init(
                 project="sedignn",
