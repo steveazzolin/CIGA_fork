@@ -1,7 +1,13 @@
 import pickle
 from BA3_loc import *
 
-global_b = '0.33'
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--global_b', default=0.33, type=str)
+args = parser.parse_args()
+
+global_b = '0.33' if args.global_b is None else args.global_b
 num_train_perc = 3000
 num_val_perc = 1000
 num_test_perc = 1000
