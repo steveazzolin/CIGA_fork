@@ -296,8 +296,6 @@ if not os.path.exists(f'../data/SPMotif-{global_b}/raw'):
 with open(f'../data/SPMotif-{global_b}/raw/train.npy', 'wb') as f:
     pickle.dump((edge_index_list, label_list, ground_truth_list, role_id_list, pos_list), f)
 
-exit("Generating only train")
-
 import random
 
 from tqdm import tqdm
