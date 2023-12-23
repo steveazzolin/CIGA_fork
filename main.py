@@ -580,7 +580,7 @@ def main():
                         f"pred_loss_{seed}": pred_loss.item(),
                         f"contrast_loss_{seed}": contrast_loss.item(),
                         f"spu_pred_loss_{seed}": spu_pred_loss.item(),
-                    })
+                    }, step=epoch)
 
             all_contrast_loss /= n_bw
             all_loss /= n_bw
@@ -603,7 +603,7 @@ def main():
                     f"train_acc_{seed}": train_acc,
                     f"val_acc_{seed}": val_acc,
                     f"test_acc_{seed}": test_acc
-                })
+                }, step=epoch)
 
             if val_acc <= last_val_acc:
                 # select model according to the validation acc,
