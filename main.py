@@ -26,6 +26,9 @@ from models.losses import get_contrast_loss, get_irm_loss
 from utils.logger import Logger
 from utils.util import args_print, set_seed
 
+from collections import defaultdict
+import wandb
+
 
 @torch.no_grad()
 def eval_model(model, device, loader, evaluator, eval_metric='acc', save_pred=False):
@@ -164,6 +167,7 @@ def main():
     parser.add_argument('--no_tqdm', action='store_true')
     parser.add_argument('--commit', default='', type=str, help='experiment name')
     parser.add_argument('--save_model', action='store_true')  # save pred to ./pred if not empty
+    parser.add_argument('--log_wandb', action='store_true')
 
     args = parser.parse_args()
     erm_model = None  # used to obtain pesudo labels for CNC sampling in contrastive loss
@@ -171,13 +175,16 @@ def main():
     args.seed = eval(args.seed)
 
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
-
+    print(f"Using {device}")
+    print(args)
     def ce_loss(a, b, reduction='mean'):
         return F.cross_entropy(a, b, reduction=reduction)
 
     criterion = ce_loss
     eval_metric = 'acc' if len(args.eval_metric) == 0 else args.eval_metric
     edge_dim = -1.
+    results = defaultdict(list)
+    # results["args"] = vars(args)
 
     ### automatic dataloading and splitting
     if args.dataset.lower().startswith('drugood'):
@@ -333,6 +340,7 @@ def main():
         set_seed(seed)
         # models and optimizers
         if args.erm:
+            name_model = "ERM"
             model = GNNERM(input_dim=input_dim,
                            edge_dim=edge_dim,
                            out_dim=num_classes,
@@ -344,6 +352,7 @@ def main():
                            virtual_node=args.virtual_node).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         elif args.ginv_opt.lower() in ['asap']:
+            name_model = "ASAP"
             model = GNNPooling(pooling=args.ginv_opt,
                                ratio=args.r,
                                input_dim=input_dim,
@@ -357,6 +366,7 @@ def main():
                                virtual_node=args.virtual_node).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         elif args.ginv_opt.lower() == 'gib':
+            name_model = "GIB"
             model = GIB(ratio=args.r,
                         input_dim=input_dim,
                         edge_dim=edge_dim,
@@ -369,6 +379,7 @@ def main():
                         virtual_node=args.virtual_node).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         else:
+            name_model = "CIGA" + ("v2" if args.spu_coe > 0 else "v1")
             model = CIGA(ratio=args.r,
                          input_dim=input_dim,
                          edge_dim=edge_dim,
@@ -386,6 +397,21 @@ def main():
                          s_rep=args.spurious_rep).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         print(model)
+
+
+        if args.log_wandb:
+            name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}"
+            run = wandb.init(
+                    project="sedignn",
+                    name=name,
+                    entity="mcstewe",
+                    reinit=True,
+                    save_code=False,
+                    config=args
+            )
+            wandb.watch(model)
+
+
         last_train_acc, last_test_acc, last_val_acc = 0, 0, 0
         cnt = 0
         # generate environment partitions
@@ -539,6 +565,17 @@ def main():
                 batch_loss.backward()
                 model_optimizer.step()
                 all_loss += batch_loss.item()
+                
+                results["pred_loss"].append(pred_loss.item())
+                results["contrast_loss"].append(contrast_loss.item())
+                results["spu_pred_loss"].append(spu_pred_loss.item())
+
+                if args.log_wandb:
+                    wandb.log({
+                        "pred_loss": pred_loss.item(),
+                        "contrast_loss": contrast_loss.item(),
+                        "spu_pred_loss": spu_pred_loss.item(),
+                    })
 
             all_contrast_loss /= n_bw
             all_loss /= n_bw
@@ -551,6 +588,18 @@ def main():
                                   test_loader,
                                   evaluator,
                                   eval_metric=eval_metric)
+            
+            results["train_acc"].append(train_acc)
+            results["val_acc"].append(val_acc)
+            results["test_acc"].append(test_acc)
+
+            if args.log_wandb:
+                wandb.log({
+                    "train_acc": train_acc,
+                    "val_acc": val_acc,
+                    "test_acc": test_acc
+                })
+
             if val_acc <= last_val_acc:
                 # select model according to the validation acc,
                 #                  after the pretraining stage
@@ -589,7 +638,15 @@ def main():
         torch.tensor(all_info['train_acc']).mean(),
         torch.tensor(all_info['train_acc']).std(),
         torch.tensor(all_info['val_acc']).mean(),
-        torch.tensor(all_info['val_acc']).std()))
+        torch.tensor(all_info['val_acc']).std())
+    )
+
+    if args.log_wandb:
+        wandb.log({
+            "final_test_acc": str(torch.tensor(all_info['test_acc']).mean()) + "+-" + str(torch.tensor(all_info['test_acc']).std()),
+            "final_train_acc": str(torch.tensor(all_info['train_acc']).mean()) + "+-" + str(torch.tensor(all_info['train_acc']).std()),
+            "final_val_acc": str(torch.tensor(all_info['val_acc']).mean()) + "+-" + str(torch.tensor(all_info['val_acc']).std())
+        })
 
     if args.save_model:
         print("Saving best weights..")
@@ -597,10 +654,14 @@ def main():
         for k, v in best_weights.items():
             best_weights[k] = v.cpu()
         torch.save(best_weights, model_path)
+        if args.log_wandb:
+            wandb.save(f'{wandb.run.dir}/best_model.pt')
         print("Done..")
 
     print("\n\n\n")
     torch.cuda.empty_cache()
+    if args.log_wandb:
+        run.finish()
 
 
 if __name__ == "__main__":

@@ -239,6 +239,7 @@ class CIGA(nn.Module):
     def split_graph(self,data, edge_score, ratio):
         # Adopt from GOOD benchmark to improve the efficiency
         from torch_geometric.utils import degree
+
         def sparse_sort(src: torch.Tensor, index: torch.Tensor, dim=0, descending=False, eps=1e-12):
             r'''
             Adopt from <https://github.com/rusty1s/pytorch_scatter/issues/48>_.
@@ -290,8 +291,10 @@ class CIGA(nn.Module):
         row, col = batch.edge_index
         if batch.edge_attr == None:
             batch.edge_attr = torch.ones(row.size(0)).to(device)
+        
         edge_rep = torch.cat([h[row], h[col]], dim=-1)
         pred_edge_weight = self.edge_att(edge_rep).view(-1)
+
         if self.ratio<0:
             (causal_edge_index, causal_edge_attr, causal_edge_weight), \
                 (spu_edge_index, spu_edge_attr, spu_edge_weight) = (batch.edge_index, batch.edge_attr, pred_edge_weight), \
@@ -314,6 +317,15 @@ class CIGA(nn.Module):
                                        x=causal_x,
                                        edge_attr=causal_edge_attr)
         set_masks(causal_edge_weight, self.classifier)
+
+        ##        
+        # It's doing a discrete sampling, so it' not needed to study the individual attention scores
+        ##
+        # print(causal_edge_weight)
+        # print(causal_edge_weight.shape)
+        # results["attn_scores"] = causal_edge_weight
+
+
         # obtain predictions with the classifier based on \hat{G_c}
         causal_pred, causal_rep = self.classifier(causal_graph, get_rep=True)
         clear_masks(self.classifier)
