@@ -2,3 +2,13 @@ conda create -n tmp python=3.9
 conda install pytorch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 cpuonly -c pytorch
 pip install torch_geometric==1.7.2
 pip install scikit-image==0.19.1
+
+pip install -U openmim
+mim install mmcv==1.5.0
+
+pip uninstall dgl-cu110
+pip install  dgl==0.9.0 -f https://data.dgl.ai/wheels/repo.html
+
+pip install torch-scatter==2.0.2 -f https://data.pyg.org/whl/torch-1.9.0+cpu.html
+
+pip install texttable
