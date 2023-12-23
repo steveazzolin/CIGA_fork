@@ -575,12 +575,12 @@ def main():
             all_info['val_acc'].append(last_val_acc)
 
             print("      [{:3d}/{:d}]".format(epoch, args.epoch) +
-                        "\n       train_ACC: {:.4f} / {:.4f}"
-                        "\n       valid_ACC: {:.4f} / {:.4f}"
-                        "\n       tests_ACC: {:.4f} / {:.4f}\n".format(
+                        "\n       train_ACC: {:.3f} / {:.3f}"
+                        "\n       valid_ACC: {:.3f} / {:.3f}"
+                        "\n       tests_ACC: {:.3f} / {:.3f}\n".format(
                             train_acc, torch.tensor(all_info['train_acc']).max(),
-                            test_acc, torch.tensor(all_info['test_acc']).max(),
-                            val_acc, torch.tensor(all_info['val_acc']).max()))
+                            val_acc, torch.tensor(all_info['val_acc']).max(),
+                            test_acc, torch.tensor(all_info['test_acc']).max()))
         logger.info("=" * 50)
 
     print("Test ACC:{:.4f}-+-{:.4f}\nTrain ACC:{:.4f}-+-{:.4f}\nVal ACC:{:.4f}-+-{:.4f} ".format(
