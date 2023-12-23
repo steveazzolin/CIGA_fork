@@ -1,3 +1,4 @@
+import pickle
 from BA3_loc import *
 
 global_b = '0.33'
@@ -137,7 +138,7 @@ for _ in range(1000):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     ground_truth = find_gd(edge_index, role_id)
 
@@ -191,7 +192,7 @@ for _ in tqdm(range(num_train_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -227,7 +228,7 @@ for _ in tqdm(range(num_train_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -263,7 +264,7 @@ for _ in tqdm(range(num_train_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -280,8 +281,12 @@ if not os.path.exists(f'../data/mSPMotif-{global_b}/'):
     os.mkdir(f'../data/mSPMotif-{global_b}/')
 if not os.path.exists(f'../data/mSPMotif-{global_b}/raw'):
     os.mkdir(f'../data/mSPMotif-{global_b}/raw')
-np.save(f'../data/mSPMotif-{global_b}/raw/train.npy',
-        (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+
+# np.save(f'../data/mSPMotif-{global_b}/raw/train.npy',
+#         (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+    
+with open(f'../data/mSPMotif-{global_b}/raw/train.npy', 'wb') as f:
+    pickle.dump((edge_index_list, label_list, ground_truth_list, role_id_list, pos_list), f)
 
 import random
 
@@ -316,7 +321,7 @@ for _ in tqdm(range(num_val_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -352,7 +357,7 @@ for _ in tqdm(range(num_val_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -388,7 +393,7 @@ for _ in tqdm(range(num_val_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -401,8 +406,11 @@ for _ in tqdm(range(num_val_perc)):
     pos_list.append(pos)
 print(np.mean(n_mean), np.mean(e_mean))
 print(len(ground_truth_list))
-np.save(f'../data/mSPMotif-{global_b}/raw/val.npy',
-        (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+# np.save(f'../data/mSPMotif-{global_b}/raw/val.npy',
+#         (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+
+with open(f'../data/mSPMotif-{global_b}/raw/val.npy', 'wb') as f:
+    pickle.dump((edge_index_list, label_list, ground_truth_list, role_id_list, pos_list), f)
 
 import random
 
@@ -436,7 +444,7 @@ for _ in tqdm(range(num_test_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -472,7 +480,7 @@ for _ in tqdm(range(num_test_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -508,7 +516,7 @@ for _ in tqdm(range(num_test_perc)):
                                  m=3,
                                  draw=False)
     role_id = np.array(role_id)
-    edge_index = np.array(G.edges, dtype=np.int).T
+    edge_index = np.array(G.edges, dtype=int).T
     row, col = edge_index
     e_mean.append(len(G.edges))
     n_mean.append(len(G.nodes))
@@ -521,5 +529,8 @@ for _ in tqdm(range(num_test_perc)):
     pos_list.append(pos)
 print(np.mean(n_mean), np.mean(e_mean))
 print(len(ground_truth_list))
-np.save(f'../data/mSPMotif-{global_b}/raw/test.npy',
-        (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+# np.save(f'../data/mSPMotif-{global_b}/raw/test.npy',
+#         (edge_index_list, label_list, ground_truth_list, role_id_list, pos_list))
+
+with open(f'../data/mSPMotif-{global_b}/raw/test.npy', 'wb') as f:
+    pickle.dump((edge_index_list, label_list, ground_truth_list, role_id_list, pos_list), f)

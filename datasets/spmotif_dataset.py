@@ -89,7 +89,7 @@ class SPMotif(InMemoryDataset):
                         z=z,
                         edge_index=edge_index,
                         edge_attr=edge_attr,
-                        pos=p,
+                        # pos=p,
                         edge_gt_att=torch.LongTensor(ground_truth),
                         name=f'SPMotif-{self.mode}-{idx}',
                         idx=idx)
