@@ -22,5 +22,5 @@ data/*
 *.pdf
 *.png
 *.json
-
+wandb/
 .idea/
