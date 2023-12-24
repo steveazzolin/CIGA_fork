@@ -175,7 +175,8 @@ class CIGA(nn.Module):
                  c_rep="rep",
                  c_pool="add",
                  s_rep="rep",
-                 sigma_len=3):
+                 sigma_len=3,
+                 mitigation_backbone=None):
         super(CIGA, self).__init__()
         ### GNN to generate node embeddings
         if gnn_type.lower() == "le":
@@ -203,7 +204,8 @@ class CIGA(nn.Module):
                                             drop_ratio=drop_ratio,
                                             residual=residual,
                                             gnn_type=gnn_type,
-                                            edge_dim=edge_dim)
+                                            edge_dim=edge_dim,
+                                            mitigation_backbone=mitigation_backbone)
         self.ratio = ratio
         self.edge_att = nn.Sequential(nn.Linear(emb_dim * 2, emb_dim * 4), nn.ReLU(), nn.Linear(emb_dim * 4, 1))
         self.s_rep = s_rep

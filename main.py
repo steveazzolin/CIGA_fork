@@ -168,6 +168,7 @@ def main():
     parser.add_argument('--commit', default='', type=str, help='experiment name')
     parser.add_argument('--save_model', action='store_true')  # save pred to ./pred if not empty
     parser.add_argument('--log_wandb', action='store_true')
+    parser.add_argument('--mitigation_backbone', default=None, type=str)
 
     args = parser.parse_args()
     erm_model = None  # used to obtain pesudo labels for CNC sampling in contrastive loss
@@ -336,25 +337,7 @@ def main():
     logger.info(f"# Train: {len(train_loader.dataset)}  #Val: {len(valid_loader.dataset)} #Test: {len(test_loader.dataset)} ")
     best_weights = None
 
-    if args.log_wandb:
-        if args.erm:
-            name_model = "ERM"
-        elif args.ginv_opt.lower() in ['asap']:
-            name_model = "ASAP"
-        elif args.ginv_opt.lower() == 'gib':
-            name_model = "GIB"
-        else:
-            name_model = "CIGA" + ("v2" if args.spu_coe > 0 else "v1")
-        name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}"
-        run = wandb.init(
-                project="sedignn",
-                name=name,
-                entity="mcstewe",
-                reinit=True,
-                save_code=False,
-                config=args
-        )
-
+    
     for seed in args.seed:
         set_seed(seed)
         # models and optimizers
@@ -399,6 +382,9 @@ def main():
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         else:
             name_model = "CIGA" + ("v2" if args.spu_coe > 0 else "v1")
+            if not args.mitigation_backbone is None:
+                name_model += args.mitigation_backbone
+                print("Usign mitigation ->", args.mitigation_backbone)
             model = CIGA(ratio=args.r,
                          input_dim=input_dim,
                          edge_dim=edge_dim,
@@ -413,9 +399,22 @@ def main():
                          c_in=args.classifier_input_feat,
                          c_rep=args.contrast_rep,
                          c_pool=args.contrast_pooling,
-                         s_rep=args.spurious_rep).to(device)
+                         s_rep=args.spurious_rep,
+                         mitigation_backbone=args.mitigation_backbone).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
         print(model)
+
+        name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}_seed{seed}"
+        if args.log_wandb:
+            run = wandb.init(
+                    project="sedignn",
+                    name=name,
+                    entity="mcstewe",
+                    reinit=True,
+                    save_code=False,
+                    config=args
+            )
+            wandb.watch(model)
 
         last_train_acc, last_test_acc, last_val_acc = 0, 0, 0
         cnt = 0
@@ -577,10 +576,10 @@ def main():
 
                 if args.log_wandb:
                     wandb.log({
-                        f"pred_loss_{seed}": pred_loss.item(),
-                        f"contrast_loss_{seed}": contrast_loss.item(),
-                        f"spu_pred_loss_{seed}": spu_pred_loss.item(),
-                    }, step=epoch)
+                        f"pred_loss": pred_loss.item(),
+                        f"contrast_loss": contrast_loss.item(),
+                        f"spu_pred_loss": spu_pred_loss.item(),
+                    })
 
             all_contrast_loss /= n_bw
             all_loss /= n_bw
@@ -600,10 +599,10 @@ def main():
 
             if args.log_wandb:
                 wandb.log({
-                    f"train_acc_{seed}": train_acc,
-                    f"val_acc_{seed}": val_acc,
-                    f"test_acc_{seed}": test_acc
-                }, step=epoch)
+                    f"train_acc": train_acc,
+                    f"val_acc": val_acc,
+                    f"test_acc": test_acc
+                })
 
             if val_acc <= last_val_acc:
                 # select model according to the validation acc,
@@ -637,6 +636,7 @@ def main():
                             test_acc, torch.tensor(all_info['test_acc']).max()))
         logger.info("=" * 50)
 
+    print("Final results: ", name)
     print("Test ACC:{:.4f}-+-{:.4f}\nTrain ACC:{:.4f}-+-{:.4f}\nVal ACC:{:.4f}-+-{:.4f} ".format(
         torch.tensor(all_info['test_acc']).mean(),
         torch.tensor(all_info['test_acc']).std(),

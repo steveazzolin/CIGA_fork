@@ -109,7 +109,8 @@ class GNN_node(torch.nn.Module):
                  JK="last",
                  residual=False,
                  gnn_type='gin',
-                 edge_dim=-1):
+                 edge_dim=-1,
+                 mitigation_backbone=None):
         '''
             emb_dim (int): node embedding dimensionality
             num_layer (int): number of GNN message passing layers
