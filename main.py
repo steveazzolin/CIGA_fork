@@ -331,7 +331,7 @@ def main():
     exp_dir = os.path.join('./logs/', experiment_name)
     os.mkdir(exp_dir)
     logger = Logger.init_logger(filename=exp_dir + '/log.log')
-    args_print(args, logger)
+    # args_print(args, logger)
     logger.info(f"Using criterion {criterion}")
 
     logger.info(f"# Train: {len(train_loader.dataset)}  #Val: {len(valid_loader.dataset)} #Test: {len(test_loader.dataset)} ")
@@ -402,7 +402,7 @@ def main():
                          s_rep=args.spurious_rep,
                          mitigation_backbone=args.mitigation_backbone).to(device)
             model_optimizer = torch.optim.Adam(list(model.parameters()), lr=args.lr)
-        print(model)
+        # print(model)
 
         name = f"{name_model}_{args.model}_{args.num_layers}l_{args.dataset}{args.bias}_{args.classifier_input_feat}-{args.contrast_rep}_seed{seed}"
         if args.log_wandb:

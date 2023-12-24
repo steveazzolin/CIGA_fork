@@ -2,7 +2,7 @@ import torch
 from torch_geometric.nn import MessagePassing
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool, global_add_pool
-from torch_geometric.utils import degree
+from torch_geometric.utils import degree, is_undirected, to_undirected
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 
 """
@@ -12,7 +12,7 @@ Modified from OGB PyG implementation
 ### GIN convolution along the graph structure
 class GINConv(MessagePassing):
 
-    def __init__(self, emb_dim, edge_dim=3):
+    def __init__(self, emb_dim, edge_dim=3, mitigation_backbone=None):
         '''
             emb_dim (int): node embedding dimensionality
         '''
@@ -29,7 +29,24 @@ class GINConv(MessagePassing):
             self.edge_encoder = torch.nn.Linear(edge_dim, emb_dim)
         self.edge_dim = edge_dim
 
+        self.mitigation_backbone = mitigation_backbone
+        if mitigation_backbone:
+            self.mitigation_attn = torch.nn.Sequential(
+                torch.nn.Linear(2 * emb_dim, 4 * emb_dim),
+                torch.nn.BatchNorm1d(4 * emb_dim),
+                torch.nn.ReLU(),
+                torch.nn.Linear(4 * emb_dim, 1)
+            )
+
     def forward(self, x, edge_index, edge_attr):
+        # print()
+        # print("Undirected: ", is_undirected(edge_index))
+        # edge_index = to_undirected(edge_index)
+        # for i in range(x.shape[0]):
+        #     x[i] = torch.tensor([i]*x.shape[1], dtype=float)
+        # print(x.shape, edge_index.shape, edge_index[:,0])
+        # print(x[edge_index[:,0],:10])
+        # print(degree(edge_index[0,:]))
         if self.edge_dim == -1:
             edge_embedding = edge_attr
         else:
@@ -40,7 +57,22 @@ class GINConv(MessagePassing):
 
         return out
 
-    def message(self, x_j, edge_attr):
+    def message(self, x_i, x_j, edge_attr, index):
+        # print("-"*100)
+        # print(x_i.shape, x_j.shape, index.shape)
+        # print(x_i[:,:10])
+        # print()
+        # print(x_j[:,:10])
+        # print(index)
+        # print(torch.unique(index, return_counts=True))
+        # exit()
+
+        if self.mitigation_backbone:
+            attn = self.mitigation_attn(torch.cat([x_i, x_j], dim=-1))
+            # assert attn.shape == (x_i.shape[0], 1), attn.shape
+            # attn = torch.sigmoid(attn)
+            x_j = x_j * attn
+
         if self.edge_dim < 0:
             return F.relu(x_j)
         return F.relu(x_j + edge_attr)
@@ -148,9 +180,9 @@ class GNN_node(torch.nn.Module):
 
         for layer in range(num_layer):
             if gnn_type == 'gin':
-                self.convs.append(GINConv(emb_dim, edge_dim=self.edge_dim))
+                self.convs.append(GINConv(emb_dim, edge_dim=self.edge_dim, mitigation_backbone=mitigation_backbone))
             elif gnn_type == 'gcn':
-                self.convs.append(GCNConv(emb_dim, edge_dim=self.edge_dim))
+                self.convs.append(GCNConv(emb_dim, edge_dim=self.edge_dim, mitigation_backbone=mitigation_backbone))
             else:
                 ValueError('Undefined GNN type called {}'.format(gnn_type))
 
