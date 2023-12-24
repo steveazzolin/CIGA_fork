@@ -70,14 +70,13 @@ class GINConv(MessagePassing):
 
         if self.mitigation_backbone:
             attn = self.mitigation_attn(torch.cat([x_i, x_j], dim=-1))
-            # assert attn.shape == (x_i.shape[0], 1), attn.shape
             attn = torch.sigmoid(attn)
             
             if return_attn_distrib:
-                self.attn.extend(attn.detach().squeeze().numpy().tolist())
+                self.attn.extend(attn.detach().cpu().squeeze().numpy().tolist())
             
-            attn_hard = (attn > 0.5).float()
-            attn = attn_hard - attn.detach() + attn
+            # attn_hard = (attn > 0.5).float()
+            # attn = attn_hard - attn.detach() + attn
 
             x_j = x_j * attn
 
@@ -92,7 +91,7 @@ class GINConv(MessagePassing):
 ### GCN convolution along the graph structure
 class GCNConv(MessagePassing):
 
-    def __init__(self, emb_dim, edge_dim=-1):
+    def __init__(self, emb_dim, edge_dim=-1, mitigation_backbone=None):
         super(GCNConv, self).__init__(aggr='add')
 
         self.linear = torch.nn.Linear(emb_dim, emb_dim)
@@ -103,7 +102,17 @@ class GCNConv(MessagePassing):
             self.edge_encoder = torch.nn.Linear(edge_dim, emb_dim)
         self.edge_dim = edge_dim
 
-    def forward(self, x, edge_index, edge_attr):
+        self.mitigation_backbone = mitigation_backbone
+        if mitigation_backbone:
+            self.attn = []
+            self.mitigation_attn = torch.nn.Sequential(
+                torch.nn.Linear(2 * emb_dim, 1),
+                # torch.nn.BatchNorm1d(4 * emb_dim),
+                # torch.nn.ReLU(),
+                # torch.nn.Linear(2 * emb_dim, 1)
+            )
+
+    def forward(self, x, edge_index, edge_attr, return_attn_distrib=False):
         x = self.linear(x)
         if self.edge_dim == -1:
             edge_embedding = edge_attr
@@ -120,12 +129,26 @@ class GCNConv(MessagePassing):
 
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
 
-        return self.propagate(edge_index, x=x, edge_attr=edge_embedding,
-                              norm=norm) + F.relu(x + self.root_emb.weight) * 1. / deg.view(-1, 1)
+        return self.propagate(edge_index,
+                    x=x,
+                    edge_attr=edge_embedding,
+                    norm=norm,
+                    return_attn_distrib=return_attn_distrib
+                ) + F.relu(x + self.root_emb.weight) * 1. / deg.view(-1, 1)
 
-    def message(self, x_j, edge_attr, norm):
-        # print(edge_attr.size())
-        # print(x_j.size())
+    def message(self, x_i, x_j, edge_attr, norm, return_attn_distrib):
+        if self.mitigation_backbone:
+            attn = self.mitigation_attn(torch.cat([x_i, x_j], dim=-1))
+            attn = torch.sigmoid(attn)
+            
+            if return_attn_distrib:
+                self.attn.extend(attn.detach().cpu().squeeze().numpy().tolist())
+            
+            # attn_hard = (attn > 0.5).float()
+            # attn = attn_hard - attn.detach() + attn
+
+            x_j = x_j * attn
+
         if self.edge_dim < 0:
             return norm.view(-1, 1) * F.relu(x_j)
         return norm.view(-1, 1) * F.relu(x_j + edge_attr)
