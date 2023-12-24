@@ -284,9 +284,9 @@ class CIGA(nn.Module):
         return (new_causal_edge_index, new_causal_edge_attr, new_causal_edge_weight), \
             (new_spu_edge_index, new_spu_edge_attr, new_spu_edge_weight)
 
-    def forward(self, batch, return_data="pred", return_spu=False, debug=False):
+    def forward(self, batch, return_data="pred", return_spu=False, debug=False, return_attn_distrib=False):
         # obtain the graph embeddings from the featurizer GNN encoder
-        h = self.gnn_encoder(batch)
+        h = self.gnn_encoder(batch, return_attn_distrib)
         device = h.device
         # seperate the input graphs into \hat{G_c} and \hat{G_s}
         # using edge-level attetion

@@ -31,10 +31,11 @@ import wandb
 
 
 @torch.no_grad()
-def eval_model(model, device, loader, evaluator, eval_metric='acc', save_pred=False):
+def eval_model(model, device, loader, evaluator, eval_metric='acc', save_pred=False, is_val=False):
     model.eval()
     y_true = []
     y_pred = []
+    attn_distrib = defaultdict(list)
 
     for batch in loader:
         batch = batch.to(device)
@@ -42,7 +43,11 @@ def eval_model(model, device, loader, evaluator, eval_metric='acc', save_pred=Fa
             pass
         else:
             with torch.no_grad():
-                pred = model(batch)
+                pred = model(batch, return_attn_distrib=True if is_val else False)
+                if is_val:
+                    for j, conv in enumerate(model.gnn_encoder.convs):
+                        attn_distrib[f"conv_{j}"].extend(conv.attn)
+                        conv.attn = []
             is_labeled = batch.y == batch.y
             if eval_metric == 'acc':
                 if len(batch.y.size()) == len(batch.y.size()):
@@ -93,7 +98,10 @@ def eval_model(model, device, loader, evaluator, eval_metric='acc', save_pred=Fa
     if save_pred:
         return res_metric, y_pred
     else:
-        return res_metric
+        if is_val:
+            return res_metric, attn_distrib
+        else:
+            return res_metric
 
 
 def main():
@@ -573,6 +581,7 @@ def main():
                 results["pred_loss"].append(pred_loss.item())
                 results["contrast_loss"].append(contrast_loss.item())
                 results["spu_pred_loss"].append(spu_pred_loss.item())
+                # results["attn_distrib"].append()
 
                 if args.log_wandb:
                     wandb.log({
@@ -586,16 +595,19 @@ def main():
 
             model.eval()
             train_acc = eval_model(model, device, train_loader, evaluator, eval_metric=eval_metric)
-            val_acc = eval_model(model, device, valid_loader, evaluator, eval_metric=eval_metric)
+            val_acc, attn_distrib = eval_model(model, device, valid_loader, evaluator, eval_metric=eval_metric, is_val=True)
             test_acc = eval_model(model,
                                   device,
                                   test_loader,
                                   evaluator,
-                                  eval_metric=eval_metric)
+                                  eval_metric=eval_metric,)
             
             results["train_acc"].append(train_acc)
             results["val_acc"].append(val_acc)
             results["test_acc"].append(test_acc)
+
+            for k in attn_distrib.keys():
+                print("attn_distrib: {:.2f}+-{:.2f}".format(np.mean(attn_distrib[k]), np.std(attn_distrib[k])))
 
             if args.log_wandb:
                 wandb.log({

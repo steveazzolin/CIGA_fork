@@ -31,14 +31,15 @@ class GINConv(MessagePassing):
 
         self.mitigation_backbone = mitigation_backbone
         if mitigation_backbone:
+            self.attn = []
             self.mitigation_attn = torch.nn.Sequential(
-                torch.nn.Linear(2 * emb_dim, 4 * emb_dim),
-                torch.nn.BatchNorm1d(4 * emb_dim),
-                torch.nn.ReLU(),
-                torch.nn.Linear(4 * emb_dim, 1)
+                torch.nn.Linear(2 * emb_dim, 1),
+                # torch.nn.BatchNorm1d(4 * emb_dim),
+                # torch.nn.ReLU(),
+                # torch.nn.Linear(2 * emb_dim, 1)
             )
 
-    def forward(self, x, edge_index, edge_attr):
+    def forward(self, x, edge_index, edge_attr, return_attn_distrib=False):
         # print()
         # print("Undirected: ", is_undirected(edge_index))
         # edge_index = to_undirected(edge_index)
@@ -53,11 +54,11 @@ class GINConv(MessagePassing):
             if self.edge_dim == 1:
                 edge_attr = edge_attr.long()
             edge_embedding = self.edge_encoder(edge_attr)
-        out = self.mlp((1 + self.eps) * x + self.propagate(edge_index, x=x, edge_attr=edge_embedding))
+        out = self.mlp((1 + self.eps) * x + self.propagate(edge_index, x=x, edge_attr=edge_embedding, return_attn_distrib=return_attn_distrib))
 
         return out
 
-    def message(self, x_i, x_j, edge_attr, index):
+    def message(self, x_i, x_j, edge_attr, index, return_attn_distrib):
         # print("-"*100)
         # print(x_i.shape, x_j.shape, index.shape)
         # print(x_i[:,:10])
@@ -70,7 +71,14 @@ class GINConv(MessagePassing):
         if self.mitigation_backbone:
             attn = self.mitigation_attn(torch.cat([x_i, x_j], dim=-1))
             # assert attn.shape == (x_i.shape[0], 1), attn.shape
-            # attn = torch.sigmoid(attn)
+            attn = torch.sigmoid(attn)
+            
+            if return_attn_distrib:
+                self.attn.extend(attn.detach().squeeze().numpy().tolist())
+            
+            attn_hard = (attn > 0.5).float()
+            attn = attn_hard - attn.detach() + attn
+
             x_j = x_j * attn
 
         if self.edge_dim < 0:
@@ -188,12 +196,12 @@ class GNN_node(torch.nn.Module):
 
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
 
-    def forward(self, batched_data):
+    def forward(self, batched_data, return_attn_distrib=False):
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
         ### computing input node embedding
         h_list = [self.node_encoder(x)]
         for layer in range(self.num_layer):
-            h = self.convs[layer](h_list[layer], edge_index, edge_attr)
+            h = self.convs[layer](h_list[layer], edge_index, edge_attr, return_attn_distrib)
             h = self.batch_norms[layer](h)
 
             if layer == self.num_layer - 1:
